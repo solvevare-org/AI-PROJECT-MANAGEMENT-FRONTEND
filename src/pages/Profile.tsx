@@ -38,6 +38,12 @@ const STATUS_CLS: Record<string, string> = {
     'in-progress': 'badge-in-progress', done: 'badge-done',
 };
 
+const fmtHours = (h: number): string => {
+    if (!h || h <= 0) return '0 mins';
+    if (h < 1) return `${Math.round(h * 60)} mins`;
+    return `${h}h`;
+};
+
 const getPerformanceLabel = (est: number, actual: number | null) => {
     if (actual == null) return null;
     const ratio = actual / (est || 1);
@@ -229,7 +235,7 @@ export default function Profile() {
                                             <span className={`badge ${PRIORITY_CLS[t.priority]}`}>{t.priority}</span>
                                             <span className={`badge ${STATUS_CLS[t.status]}`}>{t.status}</span>
                                         </div>
-                                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', flexShrink: 0 }}>{t.estimatedHours}h est.</div>
+                                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', flexShrink: 0 }}>{fmtHours(t.estimatedHours)} est.</div>
                                     </div>
                                 ))}
                             </div>
@@ -266,7 +272,7 @@ export default function Profile() {
                                             </div>
                                             <div style={{ textAlign: 'right', flexShrink: 0 }}>
                                                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                                                    {t.estimatedHours}h est. → <strong style={{ color: '#059669' }}>{t.actualHours}h actual</strong>
+                                                    {fmtHours(t.estimatedHours)} est. → <strong style={{ color: '#059669' }}>{fmtHours(t.actualHours)} actual</strong>
                                                 </div>
                                                 {perf && (
                                                     <div style={{ fontSize: '0.72rem', fontWeight: 700, color: perf.color, marginTop: 2 }}>

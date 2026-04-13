@@ -32,6 +32,12 @@ const PRIORITY_CLS: Record<string, string> = {
 // Format a date as "Jan 15"
 const fmtDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
+const fmtHours = (h: number): string => {
+    if (!h || h <= 0) return '0 mins';
+    if (h < 1) return `${Math.round(h * 60)} mins`;
+    return `${h}h`;
+};
+
 // Format a date as "Jan 15, 10:30 AM"
 const fmtDateTime = (iso: string) => {
     const d = new Date(iso);
@@ -232,7 +238,7 @@ export default function Timeline() {
                                                     </div>
                                                     <div style={{ display: 'flex', gap: 4 }}>
                                                         <span className={`badge ${PRIORITY_CLS[item.priority]}`} style={{ fontSize: '0.6rem' }}>{item.priority}</span>
-                                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{item.etaHours}h</span>
+                                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{fmtHours(item.etaHours)}</span>
                                                     </div>
                                                 </div>
 
@@ -325,7 +331,7 @@ export default function Timeline() {
                                         {item.actualHours != null && (
                                             <div style={{ textAlign: 'right' }}>
                                                 <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>ACTUAL</div>
-                                                <div style={{ fontWeight: 700, color: '#059669' }}>{item.actualHours}h</div>
+                                                <div style={{ fontWeight: 700, color: '#059669' }}>{fmtHours(item.actualHours!)}</div>
                                             </div>
                                         )}
                                         <div style={{ textAlign: 'right' }}>
@@ -372,9 +378,9 @@ export default function Timeline() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, color: '#94a3b8' }}>
                         <span>🗓 Start: <strong style={{ color: '#f1f5f9' }}>{fmtDateTime(tooltip.item.scheduledStart)}</strong></span>
                         <span>🏁 End: <strong style={{ color: '#f1f5f9' }}>{fmtDateTime(tooltip.item.scheduledEnd)}</strong></span>
-                        <span>⏱ ETA: <strong style={{ color: '#f1f5f9' }}>{tooltip.item.etaHours}h</strong> (est: {tooltip.item.estimatedHours}h)</span>
+                        <span>⏱ ETA: <strong style={{ color: '#f1f5f9' }}>{fmtHours(tooltip.item.etaHours)}</strong> (est: {fmtHours(tooltip.item.estimatedHours)})</span>
                         {tooltip.item.actualHours != null && (
-                            <span>✅ Actual: <strong style={{ color: '#34d399' }}>{tooltip.item.actualHours}h</strong></span>
+                            <span>✅ Actual: <strong style={{ color: '#34d399' }}>{fmtHours(tooltip.item.actualHours)}</strong></span>
                         )}
                         <span>👤 {tooltip.item.assignedTo?.name ?? 'Unassigned'}</span>
                     </div>

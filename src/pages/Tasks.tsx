@@ -31,6 +31,14 @@ const STATUS_DOT: Record<string, string> = {
 };
 const PROJECT_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#0891b2'];
 
+// Format hours: agar < 1 hour toh minutes dikhao, warna hours
+// 0.5 → "30 mins" | 1.5 → "1.5h" | 3 → "3h"
+const fmtHours = (h: number): string => {
+    if (!h || h <= 0) return '0 mins';
+    if (h < 1) return `${Math.round(h * 60)} mins`;
+    return `${h}h`;
+};
+
 // Format seconds → "1h 23m 45s"
 const fmtTime = (secs: number): string => {
     if (!secs || secs < 0) return '0s';
@@ -114,7 +122,11 @@ function TaskRow({ task, serial, isAdmin, user, actionLoading, onOpen, onAssign,
                     )}
                 </div>
                 <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', marginBottom: 5 }}>
-                    {task.description.length > 90 ? task.description.slice(0, 90) + '...' : task.description}
+                    {task.description
+                        .replace(/\n/g, ' ')
+                        .replace(/\d+[\.\):]+\s*/g, '')
+                        .trim()
+                        .slice(0, 90) + (task.description.length > 90 ? '...' : '')}
                 </div>
                 {task.deadline && (() => {
                     const isOverdue = task.status !== 'done' && new Date(task.deadline) < new Date();
@@ -134,7 +146,7 @@ function TaskRow({ task, serial, isAdmin, user, actionLoading, onOpen, onAssign,
                 <div style={{ textAlign: 'right', minWidth: 90 }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Est. / Worked</div>
                     <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>
-                        {task.estimatedHours}h
+                        {fmtHours(task.estimatedHours)}
                         {liveSeconds > 0 && (
                             <span style={{ color: task.status === 'done' ? '#059669' : '#d97706', marginLeft: 4 }}>
                                 / {fmtTime(liveSeconds)}
@@ -153,7 +165,7 @@ function TaskRow({ task, serial, isAdmin, user, actionLoading, onOpen, onAssign,
                             }}>
                                 {isMyTask ? '👤 You' : `👤 ${task.assignedTo.name}`}
                             </div>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 1 }}>{task.estimatedHours}h estimated</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 1 }}>{fmtHours(task.estimatedHours)} estimated</div>
                           </div>
                         : <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -298,8 +310,37 @@ function TaskModal({ task, isAdmin, onClose, onSaved }: {
                             {/* Description */}
                             <div>
                                 <div className="task-modal-label">Description</div>
-                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, background: '#f9fafb', padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)' }}>
-                                    {task.description || '—'}
+                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.8, background: '#f9fafb', padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                                    {task.description
+                                        ? task.description.split('\n').map((line, i) => {
+                                            const trimmed = line.trim();
+                                            if (!trimmed) return null;
+                                            const isStep = /^\d+[\.\):]/.test(trimmed);
+                                            return (
+                                                <div key={i} style={{
+                                                    display: 'flex', gap: 10, marginBottom: 6,
+                                                    alignItems: 'flex-start',
+                                                }}>
+                                                    {isStep && (
+                                                        <span style={{
+                                                            flexShrink: 0, minWidth: 22, height: 22,
+                                                            borderRadius: '50%',
+                                                            background: '#2563eb', color: '#fff',
+                                                            fontSize: '0.68rem', fontWeight: 700,
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            marginTop: 1,
+                                                        }}>
+                                                            {trimmed.match(/^(\d+)/)?.[1]}
+                                                        </span>
+                                                    )}
+                                                    <span style={{ flex: 1 }}>
+                                                        {isStep ? trimmed.replace(/^\d+[\.\):]+\s*/, '') : trimmed}
+                                                    </span>
+                                                </div>
+                                            );
+                                          }).filter(Boolean)
+                                        : '—'
+                                    }
                                 </div>
                             </div>
 
@@ -316,7 +357,7 @@ function TaskModal({ task, isAdmin, onClose, onSaved }: {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                                 <div className="task-modal-stat">
                                     <div className="task-modal-label">Estimated</div>
-                                    <div className="task-modal-val">{task.estimatedHours}h</div>
+                                    <div className="task-modal-val">{fmtHours(task.estimatedHours)}</div>
                                 </div>
                                 <div className="task-modal-stat">
                                     <div className="task-modal-label">Worked So Far</div>
@@ -328,7 +369,7 @@ function TaskModal({ task, isAdmin, onClose, onSaved }: {
                                     <div className="task-modal-label">{task.status === 'done' ? 'Total Time' : 'Assigned To'}</div>
                                     <div className="task-modal-val" style={{ fontSize: '0.82rem', color: task.status === 'done' ? '#059669' : undefined }}>
                                         {task.status === 'done'
-                                            ? (task.actualHours != null ? `${task.actualHours}h` : '—')
+                                            ? (task.actualHours != null ? fmtHours(task.actualHours) : '—')
                                             : task.assignedTo
                                                 ? <span style={{ color: '#2563eb', fontWeight: 700 }}>👤 {task.assignedTo.name}</span>
                                                 : <span style={{ color: '#6b7280' }}>⏳ Pending</span>
@@ -366,7 +407,7 @@ function TaskModal({ task, isAdmin, onClose, onSaved }: {
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
                                         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Worked: {fmtTime(liveSeconds)}</span>
-                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Est: {task.estimatedHours}h</span>
+                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Est: {fmtHours(task.estimatedHours)}</span>
                                     </div>
                                 </div>
                             )}
@@ -499,6 +540,7 @@ export default function Tasks() {
             setUngrouped(tasks.filter(t => !t.project));
 
             if (grouped.length > 0 && Object.keys(expanded).length === 0) {
+                // Sirf pehla project default open
                 setExpanded({ [grouped[0]._id]: true });
             }
 
@@ -521,7 +563,9 @@ export default function Tasks() {
         return () => clearInterval(id);
     }, [fetchData]);
 
-    const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }));
+    // Sirf ek project accordion ek waqt mein open — naya open karo toh purana band
+    const toggleExpand = (id: string) =>
+        setExpanded(e => ({ [id]: !e[id] }));
 
     const doAssign = async (taskId: string) => {
         setActionLoading(taskId + 'assign');

@@ -12,6 +12,12 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
 
 const PROJECT_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706'];
 
+const fmtHours = (h: number): string => {
+    if (!h || h <= 0) return '0 mins';
+    if (h < 1) return `${Math.round(h * 60)} mins`;
+    return `${h}h`;
+};
+
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
 function AdminDashboard() {
     const navigate = useNavigate();
@@ -395,7 +401,7 @@ function DeveloperDashboard() {
                                             <span className={`badge ${PRIORITY_CLS[t.priority]}`}>{t.priority}</span>
                                             <span className={`badge ${STATUS_CLS[t.status]}`}>{t.status}</span>
                                         </div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>{t.estimatedHours}h</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>{fmtHours(t.estimatedHours)}</div>
                                     </div>
                                 ))}
                                 {active.length > 5 && (

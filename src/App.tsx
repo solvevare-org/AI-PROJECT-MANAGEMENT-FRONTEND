@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation, useNaviga
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react';
 import api from './api/axios';
 
 import Login      from './pages/Login';
@@ -16,6 +16,48 @@ import Timeline   from './pages/Timeline';
 import Proposals  from './pages/Proposals';
 import Profile    from './pages/Profile';
 import './App.css';
+
+// ── Shared Dropdown Context ───────────────────────────────────────────────────────────────────
+// Ek waqt mein sirf ek hi dropdown open rahega.
+// Jab koi naya dropdown open hoga, baaki sab automatically band ho jayenge.
+type DropdownId = 'search' | 'notifications' | null;
+
+const DropdownContext = createContext<{
+    openId: DropdownId;
+    open:   (id: DropdownId) => void;
+    close:  () => void;
+}>({
+    openId: null,
+    open:   () => {},
+    close:  () => {},
+});
+
+function DropdownProvider({ children }: { children: React.ReactNode }) {
+    const [openId, setOpenId] = useState<DropdownId>(null);
+
+    // Global click — bahar click karne par sab band
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            // Agar click kisi dropdown ke andar nahi hua toh band karo
+            if (!target.closest('[data-dropdown]')) setOpenId(null);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    return (
+        <DropdownContext.Provider value={{
+            openId,
+            open:  (id) => setOpenId(id),   // naya open karo (purana auto-close)
+            close: ()   => setOpenId(null),
+        }}>
+            {children}
+        </DropdownContext.Provider>
+    );
+}
+
+const useDropdown = () => useContext(DropdownContext);
 
 // ── Protected route wrapper ───────────────────────────────────────────────────
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -37,23 +79,15 @@ interface SearchResult {
 function GlobalSearch() {
     const [query,   setQuery]   = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
-    const [open,    setOpen]    = useState(false);
     const [loading, setLoading] = useState(false);
     const ref      = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
     const timer    = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Close on outside click
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
+    const { openId, open, close } = useDropdown();
+    const isOpen = openId === 'search';
 
     const search = useCallback(async (q: string) => {
-        if (!q.trim()) { setResults([]); setOpen(false); return; }
+        if (!q.trim()) { setResults([]); close(); return; }
         setLoading(true);
         try {
             const [pRes, tRes] = await Promise.all([
@@ -90,30 +124,30 @@ function GlobalSearch() {
                 }));
 
             setResults([...projectHits, ...taskHits]);
-            setOpen(true);
+            open('search');
         } catch { /* silent */ }
         finally { setLoading(false); }
-    }, []);
+    }, [open, close]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const q = e.target.value;
         setQuery(q);
         if (timer.current) clearTimeout(timer.current);
-        if (!q.trim()) { setResults([]); setOpen(false); return; }
+        if (!q.trim()) { setResults([]); close(); return; }
         timer.current = setTimeout(() => search(q), 300);
     };
 
     const handleSelect = (r: SearchResult) => {
         setQuery('');
         setResults([]);
-        setOpen(false);
+        close();
         navigate(r.link);
     };
 
     const TYPE_ICON: Record<string, string> = { project: '📁', task: '✅' };
 
     return (
-        <div ref={ref} className="header-search" style={{ position: 'relative' }}>
+        <div ref={ref} className="header-search" style={{ position: 'relative' }} data-dropdown>
             <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
@@ -123,14 +157,14 @@ function GlobalSearch() {
                 className="search-input"
                 value={query}
                 onChange={handleChange}
-                onFocus={() => results.length > 0 && setOpen(true)}
+                onFocus={() => { if (results.length > 0) open('search'); }}
             />
             {loading && (
                 <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' }}>
                     <span className="spinner" style={{ borderTopColor: 'var(--accent-blue)', borderColor: 'var(--border)', width: 12, height: 12 }} />
                 </div>
             )}
-            {open && results.length > 0 && (
+            {isOpen && results.length > 0 && (
                 <div className="search-dropdown">
                     {results.map(r => (
                         <div key={r.id} className="search-result-item" onClick={() => handleSelect(r)}>
@@ -143,14 +177,9 @@ function GlobalSearch() {
                             </div>
                         </div>
                     ))}
-                    {results.length === 0 && (
-                        <div style={{ padding: '14px 16px', fontSize: '0.82rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-                            No results for "{query}"
-                        </div>
-                    )}
                 </div>
             )}
-            {open && query && results.length === 0 && !loading && (
+            {isOpen && query && results.length === 0 && !loading && (
                 <div className="search-dropdown">
                     <div style={{ padding: '14px 16px', fontSize: '0.82rem', color: 'var(--text-muted)', textAlign: 'center' }}>
                         No results for "{query}"
@@ -172,9 +201,10 @@ function NotificationBell() {
     const [unread, setUnread]       = useState(0);
     const [hasMore, setHasMore]     = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [open, setOpen]           = useState(false);
     const ref                       = useRef<HTMLDivElement>(null);
     const navigate                  = useNavigate();
+    const { openId, open, close }   = useDropdown();
+    const isOpen                    = openId === 'notifications';
 
     const fetchNotifs = useCallback(async () => {
         try {
@@ -204,15 +234,6 @@ function NotificationBell() {
         return () => clearInterval(id);
     }, [fetchNotifs]);
 
-    // Close on outside click
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
-
     const markAllRead = async () => {
         await api.patch('/api/notifications/read-all');
         setNotifs(n => n.map(x => ({ ...x, read: true })));
@@ -225,7 +246,7 @@ function NotificationBell() {
             setNotifs(prev => prev.map(x => x._id === n._id ? { ...x, read: true } : x));
             setUnread(u => Math.max(0, u - 1));
         }
-        setOpen(false);
+        close();
         if (n.link) navigate(n.link);
     };
 
@@ -249,11 +270,11 @@ function NotificationBell() {
     };
 
     return (
-        <div ref={ref} style={{ position: 'relative' }}>
+        <div ref={ref} style={{ position: 'relative' }} data-dropdown>
             <button
                 className="header-icon-btn"
                 title="Notifications"
-                onClick={() => setOpen(o => !o)}
+                onClick={() => isOpen ? close() : open('notifications')}
             >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -264,7 +285,7 @@ function NotificationBell() {
                 )}
             </button>
 
-            {open && (
+            {isOpen && (
                 <div className="notif-dropdown">
                     <div className="notif-header">
                         <span style={{ fontWeight: 700, fontSize: '0.875rem' }}>Notifications</span>
@@ -469,7 +490,9 @@ function AppRouter() {
             {/* Protected app routes */}
             <Route path="/*" element={
                 <RequireAuth>
-                    <AppLayout />
+                    <DropdownProvider>
+                        <AppLayout />
+                    </DropdownProvider>
                 </RequireAuth>
             } />
         </Routes>

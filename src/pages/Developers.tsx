@@ -10,6 +10,12 @@ const calcOverallRating = (techStack: { name: string; rating: number }[]): numbe
     return Math.round(avg * 2) / 2;
 };
 
+const fmtHours = (h: number): string => {
+    if (!h || h <= 0) return '0 mins';
+    if (h < 1) return `${Math.round(h * 60)} mins`;
+    return `${h}h`;
+};
+
 // Half-star display component
 const StarDisplay = ({ rating, max = 5 }: { rating: number; max?: number }) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -269,7 +275,7 @@ export default function Developers() {
                                         <span className={`badge ${PRIORITY_CLS[t.priority] || ''}`}>{t.priority}</span>
                                         <span className={`badge ${STATUS_CLS[t.status] || ''}`}>{t.status}</span>
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>{t.estimatedHours}h</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>{fmtHours(t.estimatedHours)}</div>
                                 </div>
                             ))}
                         </div>

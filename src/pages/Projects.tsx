@@ -32,6 +32,14 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 const PROJECT_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#0891b2'];
 
+// Format hours: agar < 1 hour toh minutes dikhao, warna hours
+// 0.5 → "30 mins" | 1.5 → "1.5h" | 3 → "3h"
+const fmtHours = (h: number): string => {
+    if (!h || h <= 0) return '0 mins';
+    if (h < 1) return `${Math.round(h * 60)} mins`;
+    return `${h}h`;
+};
+
 const ALL_TECHS = [
     'React','Next.js','Vue','Angular','HTML','CSS','Tailwind','TypeScript','JavaScript',
     'Node.js','Express','Django','Laravel','Spring Boot','Python','PHP','Java','C#',
@@ -61,7 +69,41 @@ export default function Projects() {
         team: [] as string[],
         techStack: [] as string[],
     });
-    const [file, setFile] = useState<File | null>(null);
+    const [files, setFiles] = useState<File[]>([]);
+
+    const MAX_FILES = 10;
+    const MAX_SIZE_MB = 30;
+    const ALLOWED_EXTS = ['.pdf','.docx','.doc','.txt','.md','.png','.jpg','.jpeg','.webp','.bmp','.tiff','.csv'];
+
+    const addFiles = (incoming: FileList | null) => {
+        if (!incoming) return;
+        const arr = Array.from(incoming);
+        const valid: File[] = [];
+        for (const f of arr) {
+            const ext = '.' + f.name.split('.').pop()?.toLowerCase();
+            if (!ALLOWED_EXTS.includes(ext)) { toast.error(`❌ ${f.name}: unsupported type`); continue; }
+            if (f.size > MAX_SIZE_MB * 1024 * 1024) { toast.error(`❌ ${f.name}: exceeds 30MB`); continue; }
+            if (files.length + valid.length >= MAX_FILES) { toast.error(`Max ${MAX_FILES} files allowed`); break; }
+            if (!files.find(x => x.name === f.name && x.size === f.size)) valid.push(f);
+        }
+        if (valid.length) setFiles(prev => [...prev, ...valid]);
+    };
+
+    const removeFile = (idx: number) => setFiles(prev => prev.filter((_, i) => i !== idx));
+
+    const formatSize = (bytes: number) => {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    const getFileIcon = (name: string) => {
+        const ext = name.split('.').pop()?.toLowerCase();
+        if (['png','jpg','jpeg','webp','bmp','tiff'].includes(ext!)) return '🖼️';
+        if (ext === 'pdf') return '📄';
+        if (['docx','doc'].includes(ext!)) return '📝';
+        return '📁';
+    };
 
     const fetchAll = useCallback(async () => {
         try {
@@ -93,7 +135,7 @@ export default function Projects() {
 
     const resetForm = () => {
         setForm({ title: '', description: '', status: 'planning', priority: 'medium', startDate: '', endDate: '', team: [], techStack: [] });
-        setFile(null);
+        setFiles([]);
         setTechSearch('');
         setShowTechDrop(false);
         if (fileRef.current) fileRef.current.value = '';
@@ -126,41 +168,42 @@ export default function Projects() {
             const project = projRes.data;
             toast.success(`✅ Project "${project.title}" created!`);
 
-            // 2. Upload file if provided — prepend description + tech stack as context
+            // 2. Upload all files + context
             let requirementId: string | null = null;
-            if (file) {
+
+            const uploadSingleFile = async (f: File): Promise<string | null> => {
                 const fd = new FormData();
-                // Inject description + tech stack as a text prefix so AI has full context
-                const contextBlob = new Blob([
-                    `PROJECT: ${form.title}\nDESCRIPTION: ${form.description}\nTECH STACK: ${form.techStack.join(', ')}\n\n---\n\n`
-                ], { type: 'text/plain' });
-                const contextFile = new File([contextBlob], 'context.txt', { type: 'text/plain' });
-                // Upload context first
-                const ctxFd = new FormData();
-                ctxFd.append('file', contextFile);
-                try {
-                    const ctxRes = await api.post(`/api/projects/${project._id}/upload`, ctxFd, { headers: { 'Content-Type': 'multipart/form-data' } });
-                    requirementId = ctxRes.data.requirementId;
-                } catch { /* ignore context upload failure */ }
-                // Upload actual file
-                fd.append('file', file);
-                try {
-                    const upRes = await api.post(`/api/projects/${project._id}/upload`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-                    requirementId = upRes.data.requirementId;
-                    toast.success('📄 File uploaded!');
-                } catch (err: any) {
-                    toast.error(err.response?.data?.error || 'File upload failed');
+                fd.append('file', f);
+                const res = await api.post(
+                    `/api/projects/${project._id}/upload`,
+                    fd,
+                    { headers: { 'Content-Type': 'multipart/form-data' } }
+                );
+                return res.data.files?.find((x: any) => x.success)?.requirementId || null;
+            };
+
+            // Upload all selected files
+            if (files.length > 0) {
+                toast.loading(`📤 Uploading ${files.length} file(s)...`, { id: 'upload' });
+                let uploaded = 0;
+                for (const f of files) {
+                    try {
+                        const rid = await uploadSingleFile(f);
+                        if (rid && !requirementId) requirementId = rid;
+                        uploaded++;
+                    } catch (err: any) {
+                        toast.error(`❌ ${f.name}: ${err.response?.data?.error || 'upload failed'}`);
+                    }
                 }
-            } else if (form.description || form.techStack.length > 0) {
-                // No file — use description + tech stack as the requirement
-                const textContent = `PROJECT: ${form.title}\nDESCRIPTION: ${form.description}\nTECH STACK: ${form.techStack.join(', ')}`;
-                const blob = new Blob([textContent], { type: 'text/plain' });
-                const textFile = new File([blob], 'requirements.txt', { type: 'text/plain' });
-                const fd = new FormData();
-                fd.append('file', textFile);
+                toast.success(`📄 ${uploaded}/${files.length} file(s) uploaded!`, { id: 'upload' });
+            }
+
+            // Always upload description + tech stack as context
+            if (form.description || form.techStack.length > 0) {
+                const text = `PROJECT: ${form.title}\nDESCRIPTION: ${form.description}\nTECH STACK: ${form.techStack.join(', ')}`;
                 try {
-                    const upRes = await api.post(`/api/projects/${project._id}/upload`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-                    requirementId = upRes.data.requirementId;
+                    const rid = await uploadSingleFile(new File([new Blob([text], { type: 'text/plain' })], 'context.txt', { type: 'text/plain' }));
+                    if (!requirementId) requirementId = rid;
                 } catch { /* ignore */ }
             }
 
@@ -277,7 +320,7 @@ export default function Projects() {
                                     <div className="project-card-meta">
                                         <span>🗂 {proj.tasks?.length ?? 0} tasks</span>
                                         <span>📄 {proj.requirements?.length ?? 0} files</span>
-                                        <span>📅 {new Date(proj.createdAt).toLocaleDateString()}</span>
+                                        <span>⏱ {fmtHours(proj.tasks?.reduce((s: number, t: any) => s + (t.estimatedHours || 0), 0) ?? 0)} est.</span>
                                     </div>
 
                                     <div style={{ marginTop: 14 }}>
@@ -323,24 +366,61 @@ export default function Projects() {
                                 </div>
                             </div>
 
-                            {/* File Upload */}
+                            {/* File Upload — Multi */}
                             <div className="form-group">
-                                <label className="form-label">Upload Requirements File</label>
-                                <div className="modal-upload-area" onClick={() => fileRef.current?.click()}>
-                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--text-light)', marginBottom: 6 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                                    {file ? (
-                                        <div style={{ fontSize: '0.82rem', color: 'var(--accent-blue)', fontWeight: 600 }}>📄 {file.name}</div>
-                                    ) : (
-                                        <>
-                                            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Click to upload or drag & drop</div>
-                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-light)', marginTop: 2 }}>PDF, DOCX, TXT, MD, PNG, JPG, ZIP, RAR, XLSX, XLS (max 10MB)</div>
-                                        </>
-                                    )}
-                                    <input ref={fileRef} type="file" style={{ display: 'none' }}
-                                        accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg,.zip,.rar,.xlsx,.xls,.csv"
-                                        onChange={e => setFile(e.target.files?.[0] || null)} />
+                                <label className="form-label">
+                                    Upload Requirements Files
+                                    <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>(max {MAX_FILES} files · 30MB each)</span>
+                                </label>
+                                <div
+                                    className="modal-upload-area"
+                                    onClick={() => fileRef.current?.click()}
+                                    onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#2563eb'; }}
+                                    onDragLeave={e => { e.currentTarget.style.borderColor = ''; }}
+                                    onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = ''; addFiles(e.dataTransfer.files); }}
+                                >
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--text-light)', marginBottom: 6 }}>
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                                    </svg>
+                                    <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Click to browse or drag &amp; drop files</div>
+                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-light)', marginTop: 3 }}>PDF, DOCX, TXT, MD, PNG, JPG, WEBP, CSV · Up to {MAX_FILES} files · 30MB each</div>
+                                    <input
+                                        ref={fileRef} type="file" multiple style={{ display: 'none' }}
+                                        accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp,.tiff,.csv"
+                                        onChange={e => { addFiles(e.target.files); e.target.value = ''; }}
+                                    />
                                 </div>
-                                {file && <button type="button" style={{ fontSize: '0.72rem', color: 'var(--accent-red)', background: 'none', border: 'none', cursor: 'pointer', marginTop: 4 }} onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }}>✕ Remove file</button>}
+                                {files.length > 0 && (
+                                    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                {files.length} file{files.length > 1 ? 's' : ''} selected
+                                            </span>
+                                            {files.length > 1 && (
+                                                <button type="button" onClick={() => setFiles([])}
+                                                    style={{ fontSize: '0.72rem', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
+                                                    × Remove all
+                                                </button>
+                                            )}
+                                        </div>
+                                        {files.map((f, i) => (
+                                            <div key={i} style={{
+                                                display: 'flex', alignItems: 'center', gap: 10,
+                                                padding: '7px 10px', borderRadius: 8,
+                                                background: '#f8fafc', border: '1px solid var(--border)',
+                                            }}>
+                                                <span style={{ fontSize: '1rem' }}>{getFileIcon(f.name)}</span>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{formatSize(f.size)}</div>
+                                                </div>
+                                                <button type="button" onClick={() => removeFile(i)}
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: '1.1rem', lineHeight: 1, padding: '2px 4px' }}
+                                                >×</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Tech Stack */}
