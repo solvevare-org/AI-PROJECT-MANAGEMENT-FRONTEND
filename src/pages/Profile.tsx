@@ -272,7 +272,7 @@ export default function Profile() {
                                             </div>
                                             <div style={{ textAlign: 'right', flexShrink: 0 }}>
                                                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                                                    {fmtHours(t.estimatedHours)} est. → <strong style={{ color: '#059669' }}>{fmtHours(t.actualHours)} actual</strong>
+                                                    {fmtHours(t.estimatedHours)} est. → <strong style={{ color: '#059669' }}>{fmtHours(t.actualHours ?? 0)} actual</strong>
                                                 </div>
                                                 {perf && (
                                                     <div style={{ fontSize: '0.72rem', fontWeight: 700, color: perf.color, marginTop: 2 }}>

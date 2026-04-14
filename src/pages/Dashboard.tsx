@@ -204,7 +204,7 @@ function AdminDashboard() {
                             </div>
                         ) : (
                             <div>
-                                {activity.map((event: any, i: number) => {
+                                {activity.map((event: any) => {
                                     const ts  = new Date(event.timestamp);
                                     const now = Date.now();
                                     const diff = now - ts.getTime();
