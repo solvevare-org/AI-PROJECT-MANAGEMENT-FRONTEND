@@ -54,8 +54,12 @@ interface Stats {
 // Format hours: agar < 1 hour toh minutes dikhao, warna hours
 const fmtHours = (h: number): string => {
     if (!h || h <= 0) return '0 mins';
-    if (h < 1) return `${Math.round(h * 60)} mins`;
-    return `${h}h`;
+    const totalMins = Math.round(h * 60);
+    const hrs  = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    if (hrs === 0) return `${mins} mins`;
+    if (mins === 0) return `${hrs}h`;
+    return `${hrs}h ${mins} mins`;
 };
 
 interface PlanResult {

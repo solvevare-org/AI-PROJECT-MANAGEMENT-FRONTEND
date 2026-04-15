@@ -40,8 +40,12 @@ const STATUS_CLS: Record<string, string> = {
 
 const fmtHours = (h: number): string => {
     if (!h || h <= 0) return '0 mins';
-    if (h < 1) return `${Math.round(h * 60)} mins`;
-    return `${h}h`;
+    const totalMins = Math.round(h * 60);
+    const hrs  = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    if (hrs === 0) return `${mins} mins`;
+    if (mins === 0) return `${hrs}h`;
+    return `${hrs}h ${mins} mins`;
 };
 
 const getPerformanceLabel = (est: number, actual: number | null) => {
@@ -108,7 +112,7 @@ export default function Profile() {
                     <div className="card" style={{ textAlign: 'center', padding: '28px 24px' }}>
                         {/* Avatar */}
                         {profile.avatar
-                            ? <img src={`http://localhost:5000${profile.avatar}`} alt={profile.name}
+                            ? <img src={profile.avatar.startsWith('http') ? profile.avatar : `${import.meta.env.VITE_BACKEND_URL}${profile.avatar}`} alt={profile.name}
                                 style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--border)', margin: '0 auto 14px' }} />
                             : <div style={{
                                 width: 80, height: 80, borderRadius: '50%', margin: '0 auto 14px',

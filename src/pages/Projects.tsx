@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 interface Project {
     _id: string;
@@ -36,8 +37,12 @@ const PROJECT_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '
 // 0.5 → "30 mins" | 1.5 → "1.5h" | 3 → "3h"
 const fmtHours = (h: number): string => {
     if (!h || h <= 0) return '0 mins';
-    if (h < 1) return `${Math.round(h * 60)} mins`;
-    return `${h}h`;
+    const totalMins = Math.round(h * 60);
+    const hrs  = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    if (hrs === 0) return `${mins} mins`;
+    if (mins === 0) return `${hrs}h`;
+    return `${hrs}h ${mins} mins`;
 };
 
 const ALL_TECHS = [
@@ -50,6 +55,7 @@ const ALL_TECHS = [
 export default function Projects() {
     const navigate = useNavigate();
     const location = useLocation();
+    const { isAdmin } = useAuth();
     const [projects, setProjects] = useState<Project[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
@@ -125,13 +131,13 @@ export default function Projects() {
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
-    // Auto-open modal when navigated here with ?new=1 (e.g. from Dashboard)
+    // Auto-open modal when navigated here with ?new=1 — admin only
     useEffect(() => {
         if (new URLSearchParams(location.search).get('new') === '1') {
-            setShowModal(true);
+            if (isAdmin) setShowModal(true);
             navigate('/projects', { replace: true });
         }
-    }, [location.search, navigate]);
+    }, [location.search, navigate, isAdmin]);
 
     const resetForm = () => {
         setForm({ title: '', description: '', status: 'planning', priority: 'medium', startDate: '', endDate: '', team: [], techStack: [] });
@@ -259,10 +265,12 @@ export default function Projects() {
                     <h1 className="page-title">Projects</h1>
                     <p className="page-subtitle">Manage and track all your projects</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    New Project
-                </button>
+                {isAdmin && (
+                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        New Project
+                    </button>
+                )}
             </div>
 
             {/* Filters */}
@@ -292,8 +300,10 @@ export default function Projects() {
                 <div className="card" style={{ textAlign: 'center', padding: '64px 32px' }}>
                     <div style={{ fontSize: '2.5rem', marginBottom: 12, opacity: 0.3 }}>📁</div>
                     <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>No projects found</div>
-                    <div style={{ fontSize: '0.855rem', color: 'var(--text-muted)', marginBottom: 20 }}>Create your first project to get started</div>
-                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Project</button>
+                    <div style={{ fontSize: '0.855rem', color: 'var(--text-muted)', marginBottom: 20 }}>No projects have been created yet</div>
+                    {isAdmin && (
+                        <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Project</button>
+                    )}
                 </div>
             ) : (
                 <div className="projects-grid">

@@ -31,12 +31,20 @@ const STATUS_DOT: Record<string, string> = {
 };
 const PROJECT_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#0891b2'];
 
-// Format hours: agar < 1 hour toh minutes dikhao, warna hours
-// 0.5 → "30 mins" | 1.5 → "1.5h" | 3 → "3h"
+// Format hours: clean human-readable display
+// 0.5  → "30 mins"
+// 1.5  → "1h 30 mins"
+// 3    → "3h"
+// 41.5 → "41h 30 mins"
+// 41.410000000000004 → "41h 25 mins" (float precision safe)
 const fmtHours = (h: number): string => {
     if (!h || h <= 0) return '0 mins';
-    if (h < 1) return `${Math.round(h * 60)} mins`;
-    return `${h}h`;
+    const totalMins = Math.round(h * 60);   // convert to minutes, round away float noise
+    const hrs  = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    if (hrs === 0) return `${mins} mins`;
+    if (mins === 0) return `${hrs}h`;
+    return `${hrs}h ${mins} mins`;
 };
 
 // Format seconds → "1h 23m 45s"

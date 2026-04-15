@@ -12,8 +12,12 @@ const calcOverallRating = (techStack: { name: string; rating: number }[]): numbe
 
 const fmtHours = (h: number): string => {
     if (!h || h <= 0) return '0 mins';
-    if (h < 1) return `${Math.round(h * 60)} mins`;
-    return `${h}h`;
+    const totalMins = Math.round(h * 60);
+    const hrs  = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    if (hrs === 0) return `${mins} mins`;
+    if (mins === 0) return `${hrs}h`;
+    return `${hrs}h ${mins} mins`;
 };
 
 // Half-star display component
@@ -327,7 +331,7 @@ export default function Developers() {
                                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
                                             <div style={{ position: 'relative' }}>
                                                 {user.avatar
-                                                    ? <img src={`http://localhost:5000${user.avatar}`} alt={user.name}
+                                                    ? <img src={user.avatar.startsWith('http') ? user.avatar : `${import.meta.env.VITE_BACKEND_URL}${user.avatar}`} alt={user.name}
                                                         style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border)' }} />
                                                     : <div style={{
                                                         width: 52, height: 52, borderRadius: '50%',

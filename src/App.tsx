@@ -205,6 +205,7 @@ function NotificationBell() {
     const navigate                  = useNavigate();
     const { openId, open, close }   = useDropdown();
     const isOpen                    = openId === 'notifications';
+    const originalTitle             = useRef(document.title);
 
     const fetchNotifs = useCallback(async () => {
         try {
@@ -227,17 +228,34 @@ function NotificationBell() {
         finally { setLoadingMore(false); }
     };
 
-    // Poll every 30s
+    // ── Update browser tab title with unread count ──────────────────────────────
+    useEffect(() => {
+        if (unread > 0) {
+            document.title = `(${unread}) SolvePM`;
+        } else {
+            document.title = originalTitle.current;
+        }
+        return () => { document.title = originalTitle.current; };
+    }, [unread]);
+
+    // ── Polling + Page Visibility API ─────────────────────────────────────────
+    // Poll every 30s. When user switches back to this tab, fetch immediately.
     useEffect(() => {
         fetchNotifs();
         const id = setInterval(fetchNotifs, 30000);
-        return () => clearInterval(id);
+        const onVisible = () => { if (document.visibilityState === 'visible') fetchNotifs(); };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            clearInterval(id);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
     }, [fetchNotifs]);
 
     const markAllRead = async () => {
         await api.patch('/api/notifications/read-all');
         setNotifs(n => n.map(x => ({ ...x, read: true })));
         setUnread(0);
+        document.title = originalTitle.current;
     };
 
     const handleClick = async (n: Notif) => {
