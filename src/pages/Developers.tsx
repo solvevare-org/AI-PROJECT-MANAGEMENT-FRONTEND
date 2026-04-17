@@ -3,6 +3,13 @@ import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
+const avatarSrc = (avatar: string): string => {
+    if (!avatar || avatar.startsWith('blob:')) return '';
+    if (avatar.startsWith('http')) return avatar;
+    const token = localStorage.getItem('solvepm_token') || '';
+    return `${import.meta.env.VITE_BACKEND_URL}${avatar}?token=${token}`;
+};
+
 // Overall rating = average of all tech ratings, supports .5 precision
 const calcOverallRating = (techStack: { name: string; rating: number }[]): number => {
     if (!techStack?.length) return 0;
@@ -330,8 +337,8 @@ export default function Developers() {
                                         {/* Avatar + Status */}
                                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
                                             <div style={{ position: 'relative' }}>
-                                                {user.avatar
-                                                    ? <img src={user.avatar.startsWith('http') ? user.avatar : `${import.meta.env.VITE_BACKEND_URL}${user.avatar}`} alt={user.name}
+                                                {avatarSrc(user.avatar)
+                                                    ? <img src={avatarSrc(user.avatar)} alt={user.name}
                                                         style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border)' }} />
                                                     : <div style={{
                                                         width: 52, height: 52, borderRadius: '50%',

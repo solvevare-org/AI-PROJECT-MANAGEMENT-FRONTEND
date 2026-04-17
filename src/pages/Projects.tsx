@@ -185,6 +185,19 @@ export default function Projects() {
                     fd,
                     { headers: { 'Content-Type': 'multipart/form-data' } }
                 );
+                
+                // Print parsed content immediately after upload
+                if (res.data.parsedContent) {
+                    console.log('\n' + '='.repeat(80));
+                    console.log(`📄 PARSED CONTENT FROM: ${f.name}`);
+                    console.log('='.repeat(80));
+                    console.log(res.data.parsedContent);
+                    console.log('='.repeat(80));
+                    console.log(`📊 Total characters: ${res.data.parsedContent.length}`);
+                    console.log(`📁 File size: ${(f.size / 1024).toFixed(2)} KB`);
+                    console.log('='.repeat(80) + '\n');
+                }
+                
                 return res.data.files?.find((x: any) => x.success)?.requirementId || null;
             };
 
@@ -218,6 +231,18 @@ export default function Projects() {
                 toast.loading('🤖 AI is generating tasks...', { id: 'ai-gen' });
                 try {
                     const genRes = await api.post(`/api/projects/${project._id}/generate-tasks/${requirementId}`);
+                    
+                    // Log parsed content to web console
+                    if (genRes.data.parsedContent) {
+                        console.log('\n' + '='.repeat(80));
+                        console.log('📄 PARSED PDF CONTENT (received from backend):');
+                        console.log('='.repeat(80));
+                        console.log(genRes.data.parsedContent);
+                        console.log('='.repeat(80));
+                        console.log(`📊 Total characters: ${genRes.data.parsedContent.length}`);
+                        console.log('='.repeat(80) + '\n');
+                    }
+                    
                     toast.success(genRes.data.message, { id: 'ai-gen' });
                 } catch (err: any) {
                     toast.error(err.response?.data?.error || 'AI task generation failed', { id: 'ai-gen' });

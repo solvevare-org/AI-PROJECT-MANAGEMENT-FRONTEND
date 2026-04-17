@@ -3,6 +3,13 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
+const avatarSrc = (avatar: string): string => {
+    if (!avatar || avatar.startsWith('blob:')) return '';
+    if (avatar.startsWith('http')) return avatar;
+    const token = localStorage.getItem('solvepm_token') || '';
+    return `${import.meta.env.VITE_BACKEND_URL}${avatar}?token=${token}`;
+};
+
 interface TechItem { name: string; rating: number; }
 
 interface ProfileData {
@@ -111,8 +118,8 @@ export default function Profile() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <div className="card" style={{ textAlign: 'center', padding: '28px 24px' }}>
                         {/* Avatar */}
-                        {profile.avatar
-                            ? <img src={profile.avatar.startsWith('http') ? profile.avatar : `${import.meta.env.VITE_BACKEND_URL}${profile.avatar}`} alt={profile.name}
+                        {avatarSrc(profile.avatar)
+                            ? <img src={avatarSrc(profile.avatar)} alt={profile.name}
                                 style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--border)', margin: '0 auto 14px' }} />
                             : <div style={{
                                 width: 80, height: 80, borderRadius: '50%', margin: '0 auto 14px',
